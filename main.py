@@ -1,9 +1,9 @@
-import tkinter as tk
-from tkinter import filedialog
-from hole_labeling import CircleDetector
-import os
 import glob
 import threading
+import tkinter as tk
+import os.path as osp
+from tkinter import filedialog
+from hole_labeling import CircleDetector
 
 
 class AnnotationApp:
@@ -26,6 +26,7 @@ class AnnotationApp:
         )
 
         self.folder_path = ""
+        self.file_path = ""
 
         # 选择文件夹按钮
         self.select_button = tk.Button(
@@ -59,6 +60,33 @@ class AnnotationApp:
         if self.file_path:
             print(f"选择的文件路径: {self.file_path}")
 
+    def select_file_or_folder(self):
+        # Create a dialog to choose between file or folder
+        dialog = tk.Toplevel(self.root)
+        dialog.title("选择类型")
+        dialog.geometry("200x100")
+
+        # Center the dialog
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        file_button = tk.Button(
+            dialog,
+            text="选择文件",
+            command=lambda: [dialog.destroy(), self.select_file()],
+        )
+        file_button.pack(pady=5)
+
+        folder_button = tk.Button(
+            dialog,
+            text="选择文件夹",
+            command=lambda: [dialog.destroy(), self.select_folder()],
+        )
+        folder_button.pack(pady=5)
+
+        # Wait for dialog to close
+        dialog.wait_window()
+
     def start_annotation(self):
         if not self.folder_path:
             print("请先选择文件夹")
@@ -67,7 +95,7 @@ class AnnotationApp:
         self.stop_flag = False  # 重置标志
         annotation_thread = threading.Thread(
             target=self._process_annotations,
-            args=(lambda: self.stop_flag,)  # 传入检查函数
+            args=(lambda: self.stop_flag,),  # 传入检查函数
         )
         annotation_thread.start()
 
@@ -75,8 +103,17 @@ class AnnotationApp:
         img_paths = [
             path
             for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp")
-            for path in glob.glob(os.path.join(self.folder_path, ext))
+            for path in glob.glob(osp.join(self.folder_path, ext))
+            if not (
+                path.endswith("_mask.png")
+                | osp.exists(osp.splitext(path)[0] + "_mask.png")
+                | osp.exists(osp.splitext(path)[0] + "_polygon.json")
+            )
         ]
+        try:
+            img_paths.sort(key=lambda x: int(osp.basename(x).split(".")[0]))
+        except:
+            img_paths.sort()
 
         if not img_paths:
             print("该文件夹中没有图像文件")
@@ -86,11 +123,6 @@ class AnnotationApp:
             if stop_flag_func():
                 print("用户请求终止标注")
                 break
-
-            if img_path.endswith("_mask.png") or os.path.exists(
-                os.path.splitext(img_path)[0] + "_mask.png"
-            ):
-                continue
 
             print(f"正在处理: {img_path}")
 
@@ -106,6 +138,7 @@ class AnnotationApp:
         self.stop_flag = True
         try:
             import cv2
+
             cv2.destroyAllWindows()
         except:
             pass
@@ -113,9 +146,44 @@ class AnnotationApp:
         self.root.destroy()
 
     def show_annotation(self):
-        self.select_file()
-        detector = CircleDetector(self.file_path)
-        detector.visualize()
+        # Ask user to choose file or folder
+        choice = tk.messagebox.askquestion(
+            "选择类型", "是否选择文件夹？\n选择'是'选择文件夹，'否'选择文件"
+        )
+
+        if choice == "yes":
+            # Select folder and visualize all images
+            self.select_folder()
+            if not self.folder_path:
+                return
+
+            # Get all image paths in folder
+            img_paths = [
+                path
+                for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp")
+                for path in glob.glob(osp.join(self.folder_path, ext))
+                if osp.exists(osp.splitext(path)[0] + "_mask.png")
+                | osp.exists(osp.splitext(path)[0] + "_polygon.json")
+            ]
+
+            # Sort images
+            try:
+                img_paths.sort(key=lambda x: int(osp.basename(x).split(".")[0]))
+            except:
+                img_paths.sort()
+
+            # Visualize each image
+            for img_path in img_paths:
+                print(f"可视化: {img_path}")
+                detector = CircleDetector(img_path)
+                detector.visualize()
+        else:
+            # Select file and visualize
+            self.select_file()
+            if self.file_path:
+                print(f"可视化: {self.file_path}")
+                detector = CircleDetector(self.file_path)
+                detector.visualize()
 
 
 if __name__ == "__main__":

@@ -53,6 +53,7 @@ def visualize(image_path, label_path, alpha=0.6):
 
     # 叠加原图与 color_mask
     overlay = cv2.addWeighted(image[:,:,::-1], alpha, color_mask, 1-alpha, 0)
+    plt.figure()
     plt.imshow(overlay)
     plt.show()
 
