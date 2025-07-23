@@ -3,7 +3,7 @@ import threading
 import tkinter as tk
 import os.path as osp
 from tkinter import filedialog
-from hole_labeling import CircleDetector
+from src.hole_labeling import CircleDetector
 
 
 class AnnotationApp:

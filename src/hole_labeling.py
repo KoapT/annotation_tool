@@ -3,8 +3,8 @@ import glob
 import numpy as np
 import json
 import os.path as osp
-import label_optimize
-import seg_visualize
+from .label_optimize import optimize
+from .seg_visualize import seg_visualize
 
 
 class CircleDetector:
@@ -189,7 +189,7 @@ class CircleDetector:
         cv2.destroyAllWindows()
 
     def opimize_ellipse(self):
-        _, selected_ellipse = label_optimize.optimize(self.selected_ellipse)
+        _, selected_ellipse = optimize(self.selected_ellipse)
         self.selected_ellipse = selected_ellipse
 
     def save_mask(self):
@@ -267,7 +267,7 @@ class CircleDetector:
         assert osp.exists(
             label_path
         ), "Label path does not exist, please annotate first!!"
-        seg_visualize.visualize(self.image_path, label_path)
+        seg_visualize(self.image_path, label_path)
 
 
 if __name__ == "__main__":
