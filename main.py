@@ -3,13 +3,15 @@ from tkinter import filedialog
 from hole_labeling import CircleDetector
 import os
 import glob
+import threading
 
 
 class AnnotationApp:
     def __init__(self, root):
         self.root = root
         self.root.title("圆孔标注工具")
-        # self.root.geometry("200x200")
+        self.stop_flag = False
+
         # 获取屏幕的宽度和高度
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -62,7 +64,14 @@ class AnnotationApp:
             print("请先选择文件夹")
             return
 
-        # 获取所有 PNG 图像路径
+        self.stop_flag = False  # 重置标志
+        annotation_thread = threading.Thread(
+            target=self._process_annotations,
+            args=(lambda: self.stop_flag,)  # 传入检查函数
+        )
+        annotation_thread.start()
+
+    def _process_annotations(self, stop_flag_func):
         img_paths = [
             path
             for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp")
@@ -74,9 +83,17 @@ class AnnotationApp:
             return
 
         for img_path in img_paths:
+            if stop_flag_func():
+                print("用户请求终止标注")
+                break
+
+            if img_path.endswith("_mask.png") or os.path.exists(
+                os.path.splitext(img_path)[0] + "_mask.png"
+            ):
+                continue
+
             print(f"正在处理: {img_path}")
 
-            # 创建标注器并运行
             detector = CircleDetector(img_path)
             detector.run()
             detector.save_polygon()
@@ -86,13 +103,19 @@ class AnnotationApp:
 
     def end_annotation(self):
         print("退出程序")
+        self.stop_flag = True
+        try:
+            import cv2
+            cv2.destroyAllWindows()
+        except:
+            pass
+        self.root.quit()
         self.root.destroy()
 
     def show_annotation(self):
         self.select_file()
         detector = CircleDetector(self.file_path)
         detector.visualize()
-
 
 
 if __name__ == "__main__":
