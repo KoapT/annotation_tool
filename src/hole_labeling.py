@@ -13,8 +13,11 @@ class CircleDetector:
         self.polygon_path = osp.splitext(image_path)[0] + "_polygon.json"
         self.mask_path = osp.splitext(image_path)[0] + "_mask.png"
         self.original = cv2.imread(image_path)
+        if self.original is None:
+            raise FileNotFoundError(f"Cannot open file: {image_path}")
         self.drag_start = None
         self.selected_ellipse = []
+        self.selected_ellipse_temp = []
         self.flag = "canny"
         self.roi_counter = 0
 
@@ -28,10 +31,12 @@ class CircleDetector:
 
         self.win_name = "Circle Detection"
         self.roi_win_name = "ROI"
-        
+
         self.current_roi_image = None
         self.canny_points = None
         self.selected_points = []
+        self.points2show = []
+
     def mouse_handler(self, event, x, y, flags, param):
         # 缩放还原为原图坐标
         x = int(x / self.scale_main)
@@ -61,13 +66,13 @@ class CircleDetector:
                     )
                     nearest_index = np.argmin(distances)
                     nearest_point = tuple(self.canny_points[nearest_index])
-                    self.selected_points.append(nearest_point)
+                    self.points2show.append(nearest_point)
             elif self.flag == "raw":
-                self.selected_points.append((x, y))
+                self.points2show.append((x, y))
 
-            if self.selected_points:
+            if self.points2show:
                 temp = self.current_roi_image.copy()
-                for pt in self.selected_points:
+                for pt in self.points2show:
                     pt_disp = (
                         int(pt[0] * self.scale_roi),
                         int(pt[1] * self.scale_roi),
@@ -76,16 +81,18 @@ class CircleDetector:
                 cv2.imshow(self.roi_win_name, temp)
 
         elif event == cv2.EVENT_MBUTTONDOWN:
-            if self.selected_points:
-                self.selected_points.pop()
+            if self.points2show:
+                self.points2show.pop()
                 temp = self.current_roi_image.copy()
-                for pt in self.selected_points:
+                for pt in self.points2show:
                     pt_disp = (
                         int(pt[0] * self.scale_roi),
                         int(pt[1] * self.scale_roi),
                     )
                     cv2.circle(temp, pt_disp, 3, (0, 0, 255), -1)
                 cv2.imshow(self.roi_win_name, temp)
+        if self.points2show:
+            self.selected_points = self.points2show.copy()
 
     def draw_preview_rect(self, start, end):
         temp = self.get_scaled_main_image()
@@ -99,30 +106,62 @@ class CircleDetector:
         self.show_image(temp)
 
     def get_scaled_main_image(self):
-        img = self.original.copy()
-        return cv2.resize(img, None, fx=self.scale_main, fy=self.scale_main)
+        if not hasattr(self, "_scaled_image") or self._scaled_image is None:
+            self._scaled_image = cv2.resize(
+                self.original, None, fx=self.scale_main, fy=self.scale_main
+            )
+        return self._scaled_image.copy()
 
-    def show_image(self, image=None):
+    def show_image(self, image=None, use_tmp=False):
+        selected_ellipse = (
+            self.selected_ellipse_temp if use_tmp else self.selected_ellipse
+        )
+
         if image is None:
             image = self.get_scaled_main_image()
-        for ellipse in self.selected_ellipse:
+        for i, ellipse in enumerate(selected_ellipse):
             cx, cy, rx, ry, angle = ellipse
             cx_s = int(cx * self.scale_main)
             cy_s = int(cy * self.scale_main)
             rx_s = int(rx * self.scale_main)
             ry_s = int(ry * self.scale_main)
-            cv2.ellipse(
-                image, (cx_s, cy_s), (rx_s, ry_s), angle, 0, 360, (0, 0, 255), 1
+            color = (
+                (0, 255, 255)
+                if i == len(selected_ellipse) - 1 and use_tmp == True
+                else (0, 0, 255)
             )
+            cv2.ellipse(image, (cx_s, cy_s), (rx_s, ry_s), angle, 0, 360, color, 1)
         cv2.imshow(self.win_name, image)
+        if use_tmp:
+            self.selected_ellipse_temp.pop()
+
+    def select_points_by_hough(self, img):
+        circles = cv2.HoughCircles(
+            img,
+            cv2.HOUGH_GRADIENT,
+            dp=1.2,
+            minDist=50,
+            param1=150,  # 高Canny阈值（突出金属圆孔）
+            param2=50,  # 累加器阈值（兼顾灵敏度与精度）
+            minRadius=8,
+            maxRadius=120,
+        )
+        if circles is not None:
+            circles = circles[0]
+            cx, cy, r = circles[np.argmax(circles[:, -1])]
+            distances = np.linalg.norm(self.canny_points - np.array([cx, cy]), axis=1)
+            self.selected_points = self.canny_points[
+                abs(distances - r) <= (r * 0.1)
+            ].tolist()
 
     def process_rectangle(self, x, y, w, h):
+        self.points2show = []
         roi = self.original[y : y + h, x : x + w]
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(3, 3))
         enhanced = clahe.apply(gray)
         blurred = cv2.medianBlur(enhanced, 5)
-        edges = cv2.Canny(blurred, 50, 150)
+        edges = cv2.Canny(blurred, 60, 150, L2gradient=True)
         points = np.column_stack(np.where(edges > 0))
         self.canny_points = np.flip(points, axis=1)
         self.roi_x, self.roi_y = x, y
@@ -140,53 +179,87 @@ class CircleDetector:
         roi_disp = cv2.resize(roi_disp, None, fx=self.scale_roi, fy=self.scale_roi)
         self.current_roi_image = roi_disp
 
+        self.select_points_by_hough(blurred)
+        self.process_roi_points(use_tmp=True)
+
         cv2.namedWindow(self.roi_win_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.roi_win_name, *self.display_size_roi)
         cv2.moveWindow(self.roi_win_name, self.display_size_main[0] + 150, 200)
         cv2.setMouseCallback(self.roi_win_name, self.roi_mouse_handler)
         cv2.imshow(self.roi_win_name, roi_disp)
 
-    def process_roi_points(self):
+    def process_roi_points(self, use_tmp=False):
         if self.current_roi_image is None or self.canny_points is None:
             return
         filtered_points = self.selected_points
-        if len(filtered_points) >= 5:
+        selected_ellipse = (
+            self.selected_ellipse_temp if use_tmp else self.selected_ellipse
+        )
+        if len(filtered_points) < 5:
+            print("At least 5 pints are required to fit an ellipse.")
+        else:
             filtered_points = np.array(filtered_points).astype(np.float32)
             ellipse = cv2.fitEllipseAMS(filtered_points)
             (cx, cy), (axes_x, axes_y), angle = ellipse
             global_cx = self.roi_x + cx
             global_cy = self.roi_y + cy
-            self.selected_ellipse.append(
+            selected_ellipse.append(
                 (global_cx, global_cy, axes_x / 2, axes_y / 2, angle)
             )
-            self.show_image()
-        self.drag_start = None
-        self.selected_points = []
-        self.flag = "canny"
+            self.show_image(use_tmp=use_tmp)
 
-    def run(self):
-        cv2.namedWindow(self.win_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.win_name, *self.display_size_main)
-        cv2.setMouseCallback(self.win_name, self.mouse_handler)
-        self.show_image()
-        while True:
-            key = cv2.waitKey(1)
-            if key == ord("q"):
-                break
-            elif key == 27:  # ESC
-                if self.selected_ellipse:
-                    self.selected_ellipse.pop()
-                    self.show_image()
-                self.drag_start = None
-                self.selected_points = []
-            elif key == 32:  # space
-                if self.drag_start is not None:
-                    self.process_roi_points()
-            elif key == ord("r"):
-                self.flag = "raw"
-                self.drag_start = None
-                self.selected_points = []
-        cv2.destroyAllWindows()
+    def run(self, stop_flag_func=None):
+        try:
+            cv2.namedWindow(self.win_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(self.win_name, *self.display_size_main)
+            cv2.setMouseCallback(self.win_name, self.mouse_handler)
+            self.show_image()
+            while True:
+                if stop_flag_func():
+                    print("用户请求终止")
+                    break
+                key = cv2.waitKey(1)
+                if key == ord("q"):
+                    self.save_mask()
+                    self.save_polygon()
+                    break
+                elif key == 27:  # ESC
+                    if self.selected_ellipse:
+                        self.selected_ellipse.pop()
+                        self.show_image()
+                    self.drag_start = None
+                    self.selected_points = []
+                    self.selected_ellipse_temp = self.selected_ellipse.copy()
+                elif key == 32:  # space
+                    if self.drag_start is not None:
+                        self.process_roi_points()
+                        self.selected_points = []
+                        self.selected_ellipse_temp = self.selected_ellipse.copy()
+                        self.drag_start = None
+                        self.flag = "canny"
+                        cv2.destroyWindow(self.roi_win_name)
+                elif key == ord("r"):
+                    self.flag = "raw"
+                    self.drag_start = None
+                    self.selected_points = []
+                    self.selected_ellipse_temp = self.selected_ellipse.copy()
+            cv2.destroyAllWindows()
+        finally:
+            # 清理资源
+            self._cleanup()
+
+    def _cleanup(self):
+        self.original = None
+        self.current_roi_image = None
+        self.current_roi_raw = None
+        self.current_roi_edges = None
+        self._scaled_image = None
+        self.canny_points = None
+        self.selected_points = []
+        self.points2show = []
+        self.selected_ellipse = []
+        self.selected_ellipse_temp = []
+        self.drag_start = None
 
     def opimize_ellipse(self):
         _, selected_ellipse = optimize(self.selected_ellipse)

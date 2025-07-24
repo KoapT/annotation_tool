@@ -127,9 +127,7 @@ class AnnotationApp:
             print(f"正在处理: {img_path}")
 
             detector = CircleDetector(img_path)
-            detector.run()
-            detector.save_polygon()
-            detector.save_mask()
+            detector.run(stop_flag_func)
 
             print(f"处理完成: {img_path}")
 
