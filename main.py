@@ -27,9 +27,8 @@ class AnnotationApp:
             f"{window_width}x{window_height}+{int((screen_width - window_width) / 2)}+{int((screen_height - window_height) / 2)}"
         )
 
-        self.folder_path = ""
-        self.file_path = ""
-        
+        self._reset_path()
+
         # 选择文件夹按钮
         self.select_button = tk.Button(
             root, text="选择文件", command=self.select_file_or_folder
@@ -61,12 +60,17 @@ class AnnotationApp:
         self.file_path = filedialog.askopenfilename()
         if self.file_path:
             print(f"选择的文件路径: {self.file_path}")
+            
+    def _reset_path(self):
+        self.folder_path = ""
+        self.file_path = ""
 
     def select_file_or_folder(self):
         # Create a dialog to choose between file or folder
         dialog = tk.Toplevel(self.root)
         dialog.title("选择类型")
         dialog.geometry("200x100")
+        self._reset_path()
 
         # Center the dialog
         dialog.transient(self.root)
@@ -156,45 +160,56 @@ class AnnotationApp:
                     print(f"请先标注：{img_path}")
 
     def _show_image_window(self, image_array):
-        """显示图像的弹窗（阻塞等待，直到点击按钮）"""
+        """显示图像的弹窗，支持按钮与键盘控制"""
         if image_array is None or not isinstance(image_array, np.ndarray):
             return
 
         # 创建弹窗窗口
         win = tk.Toplevel(self.root)
         win.title("图像可视化")
-        win.geometry("1200x800")
-        win.grab_set()  # 模态阻塞主窗口
+        win.geometry("1280x960")
+        win.grab_set()  # 阻塞主窗口
 
-        # 将图像转换为 Tk 显示格式
+        # 转为 ImageTk 图像
         image = Image.fromarray(image_array)
-        image = image.resize((1200, 700))  # 可选：缩放适配窗口
+        w,h = image.size
+        scale = min(1280./w, 900./h)
+        image = image.resize((int(w*scale), int(h*scale)))  # 可选：缩放适配窗口
         tk_image = ImageTk.PhotoImage(image)
 
-        # 显示图像
+        # 图像显示标签
         label = tk.Label(win, image=tk_image)
-        label.image = tk_image  # 防止被垃圾回收
+        label.image = tk_image
         label.pack()
 
-        # 按钮框
+        # 按钮区
         btn_frame = tk.Frame(win)
         btn_frame.pack(pady=10)
 
         def next_image():
-            win.destroy()  # 关闭窗口继续下一张
+            win.destroy()
 
         def stop_all():
             self.stop_flag = True
             win.destroy()
 
-        tk.Button(btn_frame, text="下一张", command=next_image).pack(
-            side="left", padx=20
-        )
-        tk.Button(btn_frame, text="关闭程序", command=stop_all).pack(
-            side="left", padx=20
-        )
+        btn_next = tk.Button(btn_frame, text="下一张（→）", command=next_image)
+        btn_next.pack(side="left", padx=20)
 
-        win.wait_window()  # 阻塞直到窗口关闭
+        btn_quit = tk.Button(btn_frame, text="退出程序（q）", command=stop_all)
+        btn_quit.pack(side="left", padx=20)
+
+        # 键盘绑定
+        def on_key(event):
+            if event.keysym == "Right":
+                next_image()
+            elif event.char == "q":
+                stop_all()
+
+        win.bind("<Key>", on_key)
+        win.focus_set()  # 获取键盘焦点
+
+        win.wait_window()  # 阻塞，直到关闭
 
     def end_annotation(self):
         print("退出程序")
