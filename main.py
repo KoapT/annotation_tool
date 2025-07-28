@@ -20,7 +20,7 @@ class AnnotationApp:
 
         # 设置窗口为屏幕宽度和高度的一定比例
         window_width = int(screen_width * 0.1)
-        window_height = int(screen_height * 0.2)
+        window_height = int(screen_height * 0.3)
 
         # 设置窗口尺寸并居中显示
         self.root.geometry(

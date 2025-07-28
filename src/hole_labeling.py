@@ -161,7 +161,7 @@ class CircleDetector:
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(3, 3))
         enhanced = clahe.apply(gray)
         blurred = cv2.medianBlur(enhanced, 5)
-        edges = cv2.Canny(blurred, 60, 150, L2gradient=True)
+        edges = cv2.Canny(blurred, 60, 150, L2gradient=False)
         points = np.column_stack(np.where(edges > 0))
         self.canny_points = np.flip(points, axis=1)
         self.roi_x, self.roi_y = x, y
@@ -330,7 +330,7 @@ class CircleDetector:
             )
 
         # 保存为 JSON 文件
-        with open(self.polygon_path, "w") as f:
+        with open(self.polygon_path, "w", encoding="utf-8") as f:
             json.dump(via_data, f, indent=2)
 
         print(f"Saved VIA JSON to {self.polygon_path}")

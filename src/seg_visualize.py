@@ -20,7 +20,7 @@ def seg_visualize(image_path, label_path, alpha=0.6):
     color_mask = np.zeros_like(image, dtype=np.uint8)
 
     if label_path.endswith(".json"):
-        with open(label_path, "r") as f:
+        with open(label_path, "r",encoding="utf-8") as f:
             data = json.load(f)
         # 获取第一个图像项（根据 JSON 结构）
         first_key = next(iter(data))
