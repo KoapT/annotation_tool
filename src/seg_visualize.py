@@ -1,7 +1,6 @@
 import cv2
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def _get_color(label):
@@ -54,13 +53,16 @@ def seg_visualize(image_path, label_path, alpha=0.6):
 
     # 叠加原图与 color_mask
     overlay = cv2.addWeighted(image[:, :, ::-1], alpha, color_mask, 1 - alpha, 0)
-    plt.figure()
-    plt.imshow(overlay)
-    plt.show()
+    return overlay
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     image_path = "example/new.png"
     # label_path = "example/new_mask.png"
     label_path = "example/new_polygon.json"
-    seg_visualize(image_path, label_path)
+    overlay = seg_visualize(image_path, label_path)
+    plt.figure(figsize=(1200 / 100, 800 / 100))
+    plt.imshow(overlay)
+    plt.show()

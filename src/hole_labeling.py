@@ -340,7 +340,7 @@ class CircleDetector:
         assert osp.exists(
             label_path
         ), "Label path does not exist, please annotate first!!"
-        seg_visualize(self.image_path, label_path)
+        return seg_visualize(self.image_path, label_path)
 
 
 if __name__ == "__main__":
