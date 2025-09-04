@@ -291,13 +291,15 @@ class CircleDetector:
         print(f"Saved mask image to {self.mask_path}")
 
     def save_polygon(self):
+        height, width = self.original.shape[:2]
         via_data = {}
         filename = self.image_path.split("/")[-1]  # 获取当前图像文件名
-        via_key = f"{filename}{self.original.size}"
+        via_key = f"{filename}"
 
         via_data[via_key] = {
             "filename": filename,
-            "size": self.original.size,
+            "image_height": height,
+            "image_width": width,
             "regions": [],
             "file_attributes": {},
         }
