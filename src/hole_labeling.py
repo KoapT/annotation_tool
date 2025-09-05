@@ -33,7 +33,7 @@ class CircleDetector:
             self.display_size_main[1] / self.original.shape[0],
         )
 
-        self.win_name = "Circle Detection"
+        self.win_name = f"{osp.basename(image_path)}"
         self.roi_win_name = "ROI"
 
         self.current_roi_image = None
