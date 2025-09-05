@@ -15,9 +15,22 @@ def _get_color(label):
     )
 
 
-def seg_visualize(image_path, label_path, alpha=0.6):
+def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
     image = cv2.imread(image_path)
     color_mask = np.zeros_like(image, dtype=np.uint8)
+    if bbox_path:
+        with open(bbox_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) == 5:
+                class_id, center_x, center_y, width, height = map(float, parts)
+                h, w = image.shape[:2]
+                x1 = int((center_x - width / 2) * w)
+                y1 = int((center_y - height / 2) * h)
+                x2 = int((center_x + width / 2) * w)
+                y2 = int((center_y + height / 2) * h)
+                cv2.rectangle(color_mask, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2)
 
     if label_path.endswith(".json"):
         with open(label_path, "r",encoding="utf-8") as f:

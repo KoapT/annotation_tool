@@ -12,13 +12,16 @@ class CircleDetector:
         self.image_path = image_path
         self.polygon_path = osp.splitext(image_path)[0] + "_polygon.json"
         self.mask_path = osp.splitext(image_path)[0] + "_mask.png"
+        self.bbox_path = osp.splitext(image_path)[0] + "_bbox.txt"
         self.original = cv2.imread(image_path)
         if self.original is None:
             raise FileNotFoundError(f"Cannot open file: {image_path}")
         self.drag_start = None
         self.selected_ellipse = []
         self.selected_ellipse_temp = []
+        self.bbox = []
         self.flag = "canny"
+        self.mode = "circle"
         self.roi_counter = 0
 
         # 缩放相关参数
@@ -53,7 +56,12 @@ class CircleDetector:
                 x, y = min(x1, x2), min(y1, y2)
                 w, h = abs(x2 - x1), abs(y2 - y1)
                 if w > 5 and h > 5:
-                    self.process_rectangle(x, y, w, h)
+                    if self.mode == "circle":
+                        self.process_rectangle(x, y, w, h)
+                    elif self.mode == "bbox":
+                        self.bbox = (x, y, w, h)
+                        self.show_image()
+                        self.mode = "circle"
 
     def roi_mouse_handler(self, event, x, y, flags, param):
         x = int(x / self.scale_roi)
@@ -82,7 +90,9 @@ class CircleDetector:
 
         elif event == cv2.EVENT_MBUTTONDOWN:
             if self.points2show:
-                self.points2show.pop()
+                distances = np.linalg.norm(self.points2show - np.array([x, y]), axis=1)
+                nearest_index = np.argmin(distances)
+                del self.points2show[nearest_index]
                 temp = self.current_roi_image.copy()
                 for pt in self.points2show:
                     pt_disp = (
@@ -116,9 +126,20 @@ class CircleDetector:
         selected_ellipse = (
             self.selected_ellipse_temp if use_tmp else self.selected_ellipse
         )
-
         if image is None:
             image = self.get_scaled_main_image()
+        if self.bbox:
+            x, y, w, h = self.bbox
+            cv2.rectangle(
+                image,
+                (int(x * self.scale_main), int(y * self.scale_main)),
+                (
+                    int((x + w) * self.scale_main),
+                    int((y + h) * self.scale_main),
+                ),
+                (0, 255, 0),
+                1,
+            )
         for i, ellipse in enumerate(selected_ellipse):
             cx, cy, rx, ry, angle = ellipse
             cx_s = int(cx * self.scale_main)
@@ -222,6 +243,7 @@ class CircleDetector:
                 if key == ord("q"):
                     self.save_mask()
                     self.save_polygon()
+                    self.save_bbox()
                     break
                 elif key == 27:  # ESC
                     if self.selected_ellipse:
@@ -240,6 +262,11 @@ class CircleDetector:
                         cv2.destroyWindow(self.roi_win_name)
                 elif key == ord("r"):
                     self.flag = "raw"
+                    self.drag_start = None
+                    self.selected_points = []
+                    self.selected_ellipse_temp = self.selected_ellipse.copy()
+                elif key == ord("b"):
+                    self.mode = "bbox"
                     self.drag_start = None
                     self.selected_points = []
                     self.selected_ellipse_temp = self.selected_ellipse.copy()
@@ -289,6 +316,19 @@ class CircleDetector:
         # 保存为 PNG 文件（支持 8-bit 单通道）
         cv2.imwrite(self.mask_path, mask)
         print(f"Saved mask image to {self.mask_path}")
+        
+    def save_bbox(self):
+        """_summary_: Save with YOLO format
+        """
+        height, width = self.original.shape[:2]
+        x, y, w, h = self.bbox
+        center_x = (x + w / 2) / width
+        center_y = (y + h / 2) / height
+        new_width = w / width
+        new_height = h / height
+        
+        with open(self.bbox_path, 'w', encoding='utf-8') as fout:
+            fout.writelines(f"0 {center_x} {center_y} {new_width} {new_height} \n")
 
     def save_polygon(self):
         height, width = self.original.shape[:2]
@@ -342,7 +382,7 @@ class CircleDetector:
         assert osp.exists(
             label_path
         ), "Label path does not exist, please annotate first!!"
-        return seg_visualize(self.image_path, label_path)
+        return seg_visualize(self.image_path, label_path, self.bbox_path)
 
 
 if __name__ == "__main__":
@@ -354,3 +394,4 @@ if __name__ == "__main__":
         # detector.opimize_ellipse()
         # detector.save_polygon()
         # detector.save_mask()
+        # detector.save_bbox()
