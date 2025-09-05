@@ -60,7 +60,7 @@ class AnnotationApp:
         self.file_path = filedialog.askopenfilename()
         if self.file_path:
             print(f"选择的文件路径: {self.file_path}")
-            
+
     def _reset_path(self):
         self.folder_path = ""
         self.file_path = ""
@@ -129,20 +129,28 @@ class AnnotationApp:
         except:
             img_paths.sort()
 
-        has_annotated = lambda path: osp.exists(
-            osp.splitext(path)[0] + "_mask.png"
-        ) | osp.exists(osp.splitext(path)[0] + "_polygon.json")
+        has_annotated = (
+            lambda path: osp.exists(osp.splitext(path)[0] + "_mask.png")
+            & osp.exists(osp.splitext(path)[0] + "_polygon.json")
+            & osp.exists(osp.splitext(path)[0] + "_bbox.txt")
+        )
 
         for img_path in img_paths:
             if stop_flag_func():
                 print("用户请求终止标注")
                 break
 
-            if has_annotated(img_path):
-                if process_type == "anno":
+            if process_type == "anno":
+                if has_annotated(img_path) and self.folder_path:
                     print(f"已标注: {img_path}")
                     continue
-                elif process_type == "show":
+                else:
+                    print(f"正在处理: {img_path}")
+                    detector = CircleDetector(img_path)
+                    detector.run(stop_flag_func)
+                    print(f"处理完成: {img_path}")
+            elif process_type == "show":
+                if has_annotated(img_path):
                     print(f"可视化: {img_path}")
                     detector = CircleDetector(img_path)
                     vis_result = detector.visualize()
@@ -150,13 +158,7 @@ class AnnotationApp:
                     if stop_flag_func():
                         print("用户终止了可视化")
                         break
-            else:
-                if process_type == "anno":
-                    print(f"正在处理: {img_path}")
-                    detector = CircleDetector(img_path)
-                    detector.run(stop_flag_func)
-                    print(f"处理完成: {img_path}")
-                elif process_type == "show":
+                else:
                     print(f"请先标注：{img_path}")
 
     def _show_image_window(self, image_array):
@@ -172,9 +174,9 @@ class AnnotationApp:
 
         # 转为 ImageTk 图像
         image = Image.fromarray(image_array)
-        w,h = image.size
-        scale = min(1280./w, 900./h)
-        image = image.resize((int(w*scale), int(h*scale)))  # 可选：缩放适配窗口
+        w, h = image.size
+        scale = min(1280.0 / w, 900.0 / h)
+        image = image.resize((int(w * scale), int(h * scale)))  # 可选：缩放适配窗口
         tk_image = ImageTk.PhotoImage(image)
 
         # 图像显示标签
