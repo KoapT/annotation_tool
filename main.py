@@ -154,21 +154,21 @@ class AnnotationApp:
                     print(f"可视化: {img_path}")
                     detector = CircleDetector(img_path)
                     vis_result = detector.visualize()
-                    self._show_image_window(vis_result)
+                    self._show_image_window(vis_result, osp.basename(img_path))
                     if stop_flag_func():
                         print("用户终止了可视化")
                         break
                 else:
                     print(f"请先标注：{img_path}")
 
-    def _show_image_window(self, image_array):
+    def _show_image_window(self, image_array, window_name):
         """显示图像的弹窗，支持按钮与键盘控制"""
         if image_array is None or not isinstance(image_array, np.ndarray):
             return
 
         # 创建弹窗窗口
         win = tk.Toplevel(self.root)
-        win.title("图像可视化")
+        win.title(window_name)
         win.geometry("1280x960")
         win.grab_set()  # 阻塞主窗口
 
