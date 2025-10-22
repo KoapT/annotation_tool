@@ -45,7 +45,7 @@ class CircleDetector:
         if osp.exists(self.polygon_path):
             with open(self.polygon_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            filename = self.image_path.split("/")[-1]
+            filename = osp.basename(self.image_path)
             via_key = f"{filename}"
             ellipses = data[via_key].get("ellipse", [])
             self.selected_ellipse = ellipses
@@ -53,7 +53,7 @@ class CircleDetector:
 
         if osp.exists(self.bbox_path):
             with open(self.bbox_path, 'r', encoding='utf-8') as fin:
-                line = fin.readline().strip()
+                line = fin.readline()
                 parts = line.split()
                 if len(parts) == 5:
                     _, center_x, center_y, width, height = map(float, parts)
@@ -362,7 +362,7 @@ class CircleDetector:
     def save_polygon(self):
         height, width = self.original.shape[:2]
         via_data = {}
-        filename = self.image_path.split("/")[-1]  # 获取当前图像文件名
+        filename = osp.basename(self.image_path)  # 获取当前图像文件名
         via_key = f"{filename}"
 
         via_data[via_key] = {

@@ -53,7 +53,7 @@ def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
                         (cx, cy),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1,
-                        (255, 255, 255),
+                        (0, 0, 255),
                         2,
                         cv2.LINE_AA,
                     )
@@ -78,7 +78,7 @@ def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
                     (cx, cy),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
-                    (255, 255, 255),
+                    (0, 0, 255),
                     2,
                     cv2.LINE_AA,
                 )
@@ -90,7 +90,7 @@ def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
         with open(bbox_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
         for line in lines:
-            parts = line.strip().split()
+            parts = line.split()
             if len(parts) == 5:
                 class_id, center_x, center_y, width, height = map(float, parts)
                 h, w = image.shape[:2]
