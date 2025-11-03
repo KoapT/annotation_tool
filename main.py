@@ -9,6 +9,7 @@ from src.hole_labeling import CircleDetector
 
 
 class AnnotationApp:
+
     def __init__(self, root):
         self.root = root
         self.root.title("圆孔标注工具")
@@ -30,25 +31,25 @@ class AnnotationApp:
         self._reset_path()
 
         # 选择文件夹按钮
-        self.select_button = tk.Button(
-            root, text="选择文件", command=self.select_file_or_folder
-        )
+        self.select_button = tk.Button(root,
+                                       text="选择文件",
+                                       command=self.select_file_or_folder)
         self.select_button.pack(pady=12)
 
         # 开始标注按钮
         self.start_button = tk.Button(
-            root, text="开始标注", command=lambda: self.start_annotation("anno")
-        )
+            root, text="开始标注", command=lambda: self.start_annotation("anno"))
         self.start_button.pack(pady=12)
 
         # 结果可视化按钮
         self.show_button = tk.Button(
-            root, text="结果可视化", command=lambda: self.start_annotation("show")
-        )
+            root, text="结果可视化", command=lambda: self.start_annotation("show"))
         self.show_button.pack(pady=12)
 
         # 退出程序按钮
-        self.end_button = tk.Button(root, text="退出程序", command=self.end_annotation)
+        self.end_button = tk.Button(root,
+                                    text="退出程序",
+                                    command=self.end_annotation)
         self.end_button.pack(pady=12)
 
     def select_folder(self):
@@ -79,14 +80,16 @@ class AnnotationApp:
         file_button = tk.Button(
             dialog,
             text="选择文件",
-            command=lambda: [dialog.destroy(), self.select_file()],
+            command=lambda: [dialog.destroy(),
+                             self.select_file()],
         )
         file_button.pack(pady=5)
 
         folder_button = tk.Button(
             dialog,
             text="选择文件夹",
-            command=lambda: [dialog.destroy(), self.select_folder()],
+            command=lambda: [dialog.destroy(),
+                             self.select_folder()],
         )
         folder_button.pack(pady=5)
 
@@ -110,16 +113,11 @@ class AnnotationApp:
             "anno",
             "show",
         ], "process_type must be anno or show"
-        img_paths = (
-            [
-                path
-                for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp")
-                for path in glob.glob(osp.join(self.folder_path, ext))
-                if not path.endswith("_mask.png")
-            ]
-            if self.folder_path
-            else [self.file_path]
-        )
+        img_paths = ([
+            path for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp")
+            for path in glob.glob(osp.join(self.folder_path, ext))
+            if not path.endswith("_mask.png")
+        ] if self.folder_path else [self.file_path])
 
         if not img_paths:
             print("该文件夹中没有图像文件")
@@ -132,8 +130,7 @@ class AnnotationApp:
         has_annotated = (
             lambda path: osp.exists(osp.splitext(path)[0] + "_mask.png")
             & osp.exists(osp.splitext(path)[0] + "_polygon.json")
-            & osp.exists(osp.splitext(path)[0] + "_bbox.txt")
-        )
+            & osp.exists(osp.splitext(path)[0] + "_bbox.txt"))
 
         for img_path in img_paths:
             if stop_flag_func():

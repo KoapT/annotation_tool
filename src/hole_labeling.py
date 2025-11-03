@@ -8,6 +8,7 @@ from .seg_visualize import seg_visualize
 
 
 class CircleDetector:
+
     def __init__(self, image_path):
         self.image_path = image_path
         self.polygon_path = osp.splitext(image_path)[0] + "_polygon.json"
@@ -26,7 +27,7 @@ class CircleDetector:
         self.read_anno()
 
         # 缩放相关参数
-        self.display_size_main = (1200, 800)
+        self.display_size_main = (1280, 720)
         self.display_size_roi = (200, 200)
         self.scale_main = min(
             self.display_size_main[0] / self.original.shape[1],
@@ -40,7 +41,7 @@ class CircleDetector:
         self.canny_points = None
         self.selected_points = []
         self.points2show = []
-        
+
     def read_anno(self):
         if osp.exists(self.polygon_path):
             with open(self.polygon_path, "r", encoding="utf-8") as f:
@@ -92,10 +93,11 @@ class CircleDetector:
         y = int(y / self.scale_roi)
         if event == cv2.EVENT_LBUTTONDOWN:
             if self.flag == "canny":
-                if self.canny_points is not None and len(self.canny_points) > 0:
-                    distances = np.linalg.norm(
-                        self.canny_points - np.array([x, y]), axis=1
-                    )
+                if self.canny_points is not None and len(
+                        self.canny_points) > 0:
+                    distances = np.linalg.norm(self.canny_points -
+                                               np.array([x, y]),
+                                               axis=1)
                     nearest_index = np.argmin(distances)
                     nearest_point = tuple(self.canny_points[nearest_index])
                     self.points2show.append(nearest_point)
@@ -114,7 +116,8 @@ class CircleDetector:
 
         elif event == cv2.EVENT_MBUTTONDOWN:
             if self.points2show:
-                distances = np.linalg.norm(self.points2show - np.array([x, y]), axis=1)
+                distances = np.linalg.norm(self.points2show - np.array([x, y]),
+                                           axis=1)
                 nearest_index = np.argmin(distances)
                 del self.points2show[nearest_index]
                 temp = self.current_roi_image.copy()
@@ -141,15 +144,15 @@ class CircleDetector:
 
     def get_scaled_main_image(self):
         if not hasattr(self, "_scaled_image") or self._scaled_image is None:
-            self._scaled_image = cv2.resize(
-                self.original, None, fx=self.scale_main, fy=self.scale_main
-            )
+            self._scaled_image = cv2.resize(self.original,
+                                            None,
+                                            fx=self.scale_main,
+                                            fy=self.scale_main)
         return self._scaled_image.copy()
 
     def show_image(self, image=None, use_tmp=False):
-        selected_ellipse = (
-            self.selected_ellipse_temp if use_tmp else self.selected_ellipse
-        )
+        selected_ellipse = (self.selected_ellipse_temp
+                            if use_tmp else self.selected_ellipse)
         if image is None:
             image = self.get_scaled_main_image()
         if self.bbox:
@@ -170,12 +173,10 @@ class CircleDetector:
             cy_s = int(cy * self.scale_main)
             rx_s = int(rx * self.scale_main)
             ry_s = int(ry * self.scale_main)
-            color = (
-                (0, 255, 255)
-                if i == len(selected_ellipse) - 1 and use_tmp == True
-                else (0, 0, 255)
-            )
-            cv2.ellipse(image, (cx_s, cy_s), (rx_s, ry_s), angle, 0, 360, color, 1)
+            color = ((0, 255, 255) if i == len(selected_ellipse) - 1
+                     and use_tmp == True else (0, 0, 255))
+            cv2.ellipse(image, (cx_s, cy_s), (rx_s, ry_s), angle, 0, 360,
+                        color, 1)
         cv2.imshow(self.win_name, image)
         if use_tmp:
             self.selected_ellipse_temp.pop()
@@ -194,14 +195,15 @@ class CircleDetector:
         if circles is not None:
             circles = circles[0]
             cx, cy, r = circles[np.argmax(circles[:, -1])]
-            distances = np.linalg.norm(self.canny_points - np.array([cx, cy]), axis=1)
-            self.selected_points = self.canny_points[
-                abs(distances - r) <= (r * 0.1)
-            ].tolist()
+            distances = np.linalg.norm(self.canny_points - np.array([cx, cy]),
+                                       axis=1)
+            self.selected_points = self.canny_points[abs(distances -
+                                                         r) <= (r *
+                                                                0.1)].tolist()
 
     def process_rectangle(self, x, y, w, h):
         self.points2show = []
-        roi = self.original[y : y + h, x : x + w]
+        roi = self.original[y:y + h, x:x + w]
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(3, 3))
         enhanced = clahe.apply(gray)
@@ -214,14 +216,16 @@ class CircleDetector:
 
         self.current_roi_raw = roi.copy()
         self.current_roi_edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-        roi_disp = (
-            self.current_roi_edges if self.flag == "canny" else self.current_roi_raw
-        )
+        roi_disp = (self.current_roi_edges
+                    if self.flag == "canny" else self.current_roi_raw)
         self.scale_roi = min(
             self.display_size_roi[0] / roi.shape[1],
             self.display_size_roi[1] / roi.shape[0],
         )
-        roi_disp = cv2.resize(roi_disp, None, fx=self.scale_roi, fy=self.scale_roi)
+        roi_disp = cv2.resize(roi_disp,
+                              None,
+                              fx=self.scale_roi,
+                              fy=self.scale_roi)
         self.current_roi_image = roi_disp
 
         self.select_points_by_hough(blurred)
@@ -237,9 +241,8 @@ class CircleDetector:
         if self.current_roi_image is None or self.canny_points is None:
             return
         filtered_points = self.selected_points
-        selected_ellipse = (
-            self.selected_ellipse_temp if use_tmp else self.selected_ellipse
-        )
+        selected_ellipse = (self.selected_ellipse_temp
+                            if use_tmp else self.selected_ellipse)
         if len(filtered_points) < 5:
             print("At least 5 pints are required to fit an ellipse.")
         else:
@@ -249,8 +252,7 @@ class CircleDetector:
             global_cx = self.roi_x + cx
             global_cy = self.roi_y + cy
             selected_ellipse.append(
-                (global_cx, global_cy, axes_x / 2, axes_y / 2, angle)
-            )
+                (global_cx, global_cy, axes_x / 2, axes_y / 2, angle))
             self.show_image(use_tmp=use_tmp)
 
     def run(self, stop_flag_func=None):
@@ -280,7 +282,8 @@ class CircleDetector:
                     if self.drag_start is not None:
                         self.process_roi_points()
                         self.selected_points = []
-                        self.selected_ellipse_temp = self.selected_ellipse.copy()
+                        self.selected_ellipse_temp = self.selected_ellipse.copy(
+                        )
                         self.drag_start = None
                         self.flag = "canny"
                         cv2.destroyWindow(self.roi_win_name)
@@ -340,7 +343,7 @@ class CircleDetector:
         # 保存为 PNG 文件（支持 8-bit 单通道）
         cv2.imwrite(self.mask_path, mask)
         print(f"Saved mask image to {self.mask_path}")
-        
+
     def save_bbox(self):
         """_summary_: Save with YOLO format
         """
@@ -355,7 +358,7 @@ class CircleDetector:
             new_width = w / width
             new_height = h / height
             line = f"0 {center_x} {center_y} {new_width} {new_height} \n"
-        
+
         with open(self.bbox_path, 'w', encoding='utf-8') as fout:
             fout.writelines(line)
 
@@ -373,7 +376,7 @@ class CircleDetector:
             "ellipse": [],
             "file_attributes": {},
         }
-        
+
         via_data[via_key]["ellipse"] = self.selected_ellipse
 
         for ellipse in self.selected_ellipse:
@@ -392,16 +395,14 @@ class CircleDetector:
             all_points_x = [int(pt[0]) for pt in polygon_points]
             all_points_y = [int(pt[1]) for pt in polygon_points]
 
-            via_data[via_key]["regions"].append(
-                {
-                    "shape_attributes": {
-                        "name": "polygon",
-                        "all_points_x": all_points_x,
-                        "all_points_y": all_points_y,
-                    },
-                    "region_attributes": {},
-                }
-            )
+            via_data[via_key]["regions"].append({
+                "shape_attributes": {
+                    "name": "polygon",
+                    "all_points_x": all_points_x,
+                    "all_points_y": all_points_y,
+                },
+                "region_attributes": {},
+            })
 
         # 保存为 JSON 文件
         with open(self.polygon_path, "w", encoding="utf-8") as f:
@@ -410,10 +411,10 @@ class CircleDetector:
         print(f"Saved VIA JSON to {self.polygon_path}")
 
     def visualize(self):
-        label_path = self.mask_path if osp.exists(self.mask_path) else self.polygon_path
+        label_path = self.mask_path if osp.exists(
+            self.mask_path) else self.polygon_path
         assert osp.exists(
-            label_path
-        ), "Label path does not exist, please annotate first!!"
+            label_path), "Label path does not exist, please annotate first!!"
         bbox_path = self.bbox_path if osp.exists(self.bbox_path) else None
         return seg_visualize(self.image_path, label_path, bbox_path)
 

@@ -38,9 +38,7 @@ def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
                         zip(
                             shape_attr["all_points_x"],
                             shape_attr["all_points_y"],
-                        )
-                    )
-                )
+                        )))
                 cv2.fillPoly(color_mask, [pts], color=_get_color(idx))
                 # 计算多边形中心
                 M = cv2.moments(pts)
@@ -84,7 +82,8 @@ def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
                 )
 
     # 叠加原图与 color_mask
-    overlay = cv2.addWeighted(image[:, :, ::-1], alpha, color_mask, 1 - alpha, 0)
+    overlay = cv2.addWeighted(image[:, :, ::-1], alpha, color_mask, 1 - alpha,
+                              0)
 
     if bbox_path:
         with open(bbox_path, "r", encoding="utf-8") as f:
@@ -98,9 +97,9 @@ def seg_visualize(image_path, label_path, bbox_path=None, alpha=0.6):
                 y1 = int((center_y - height / 2) * h)
                 x2 = int((center_x + width / 2) * w)
                 y2 = int((center_y + height / 2) * h)
-                cv2.rectangle(
-                    overlay, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2
-                )
+                cv2.rectangle(overlay, (x1, y1), (x2, y2),
+                              color=(0, 255, 0),
+                              thickness=2)
     if num_error:
         cv2.putText(
             overlay,
