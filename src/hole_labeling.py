@@ -216,7 +216,9 @@ class CircleDetector:
 
         self.current_roi_raw = roi.copy()
         self.current_roi_edges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-        roi_disp = (self.current_roi_edges
+        self.current_roi_edges[edges > 0] = (255, 0, 0)  # BGR 蓝色点
+        roi_disp = (cv2.addWeighted(self.current_roi_raw, 1.0,
+                                    self.current_roi_edges, 10, 0)
                     if self.flag == "canny" else self.current_roi_raw)
         self.scale_roi = min(
             self.display_size_roi[0] / roi.shape[1],
