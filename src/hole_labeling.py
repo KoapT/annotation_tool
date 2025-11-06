@@ -27,7 +27,7 @@ class CircleDetector:
         self.read_anno()
 
         # 缩放相关参数
-        self.display_size_main = (1280, 720)
+        self.display_size_main = (1280, 740)
         self.display_size_roi = (200, 200)
         self.scale_main = min(
             self.display_size_main[0] / self.original.shape[1],
@@ -65,10 +65,44 @@ class CircleDetector:
                     h_box = int(height * h)
                     self.bbox = (x, y, w_box, h_box)
 
+    def draw_crosshair(self,
+                       disp_x,
+                       disp_y,
+                       color=(0, 255, 0),
+                       dash_len=8,
+                       thickness=1):
+        """
+        在缩放显示图像上以 (disp_x, disp_y) 为中心绘制一水平和一垂直的虚线，
+        线段覆盖整个显示图像，实时跟随鼠标移动。
+        disp_x/disp_y 是窗口坐标（已经乘以 scale_main 的显示坐标）。
+        """
+        if not hasattr(self, "current_scaled_main_image"
+                       ) or self.current_scaled_main_image is None:
+            temp = self.get_scaled_main_image()
+        else:
+            temp = self.current_scaled_main_image.copy()
+        h, w = temp.shape[:2]
+        # 水平虚线
+        y = int(disp_y)
+        for x0 in range(0, w, dash_len * 2):
+            x1 = min(x0 + dash_len, w - 1)
+            cv2.line(temp, (x0, y), (x1, y), color, thickness)
+        # 垂直虚线
+        x = int(disp_x)
+        for y0 in range(0, h, dash_len * 2):
+            y1 = min(y0 + dash_len, h - 1)
+            cv2.line(temp, (x, y0), (x, y1), color, thickness)
+        cv2.imshow(self.win_name, temp)
+
     def mouse_handler(self, event, x, y, flags, param):
-        # 缩放还原为原图坐标
-        x = int(x / self.scale_main)
-        y = int(y / self.scale_main)
+        # 保留原始显示坐标（窗口坐标），并还原为原图坐标
+        raw_x, raw_y = int(x), int(y)
+        x = int(raw_x / self.scale_main)
+        y = int(raw_y / self.scale_main)
+
+        # 鼠标移动时绘制跟随的十字虚线（使用显示坐标 raw_x/raw_y）
+        if event == cv2.EVENT_MOUSEMOVE:
+            self.draw_crosshair(raw_x, raw_y)
         if event == cv2.EVENT_LBUTTONDOWN:
             self.drag_start = (x, y)
         elif event == cv2.EVENT_MOUSEMOVE and flags & cv2.EVENT_FLAG_LBUTTON:
@@ -180,6 +214,7 @@ class CircleDetector:
         cv2.imshow(self.win_name, image)
         if use_tmp:
             self.selected_ellipse_temp.pop()
+        self.current_scaled_main_image = image
 
     def select_points_by_hough(self, img):
         circles = cv2.HoughCircles(
