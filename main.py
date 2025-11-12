@@ -41,6 +41,11 @@ class AnnotationApp:
             root, text="开始标注", command=lambda: self.start_annotation("anno"))
         self.start_button.pack(pady=12)
 
+        # 检查按钮
+        self.check_button = tk.Button(
+            root, text="检查重标", command=lambda: self.start_annotation("check"))
+        self.check_button.pack(pady=12)
+
         # 结果可视化按钮
         self.show_button = tk.Button(
             root, text="结果可视化", command=lambda: self.start_annotation("show"))
@@ -104,15 +109,13 @@ class AnnotationApp:
         self.stop_flag = False  # 重置标志
         annotation_thread = threading.Thread(
             target=self._process,
-            args=(lambda: self.stop_flag, process_type),  # 传入检查函数
+            args=(lambda: self.stop_flag, process_type),
         )
         annotation_thread.start()
 
     def _process(self, stop_flag_func, process_type="anno"):
-        assert process_type in [
-            "anno",
-            "show",
-        ], "process_type must be anno or show"
+        assert process_type in ["anno", "show", "check"
+                                ], "process_type must be anno,check or show"
         img_paths = ([
             path for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp")
             for path in glob.glob(osp.join(self.folder_path, ext))
@@ -146,6 +149,11 @@ class AnnotationApp:
                     detector = CircleDetector(img_path)
                     detector.run(stop_flag_func)
                     print(f"处理完成: {img_path}")
+            elif process_type == "check":
+                print(f"正在处理: {img_path}")
+                detector = CircleDetector(img_path)
+                detector.run(stop_flag_func)
+                print(f"处理完成: {img_path}")
             elif process_type == "show":
                 if has_annotated(img_path):
                     print(f"可视化: {img_path}")
