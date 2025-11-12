@@ -121,6 +121,37 @@ class CircleDetector:
                         self.bbox = (x, y, w, h)
                         self.show_image()
                         self.mode = "circle"
+        elif event == cv2.EVENT_MBUTTONDOWN:
+            # 中键点击：如果点击位置位于某个已选椭圆内部，则删除该椭圆
+            if self.selected_ellipse:
+                click_x = float(x)
+                click_y = float(y)
+                removed = False
+                for i, ellipse in enumerate(self.selected_ellipse):
+                    cx, cy, rx, ry, angle = ellipse
+                    # 将点变换到椭圆局部坐标系（逆旋转）
+                    th = np.deg2rad(angle)
+                    dx = click_x - float(cx)
+                    dy = click_y - float(cy)
+                    # local coords = R(-angle) * (dx,dy)
+                    xl = np.cos(th) * dx + np.sin(th) * dy
+                    yl = -np.sin(th) * dx + np.cos(th) * dy
+                    # 判断点是否在椭圆内（rx, ry 为半轴）
+                    if (xl * xl) / (float(rx) * float(rx) + 1e-12) + (
+                            yl * yl) / (float(ry) * float(ry) + 1e-12) <= 1.0:
+                        # 删除该椭圆并刷新显示
+                        del self.selected_ellipse[i]
+                        # 更新临时副本并重新显示
+                        self.drag_start = None
+                        self.selected_points = []
+                        self.selected_ellipse_temp = self.selected_ellipse.copy(
+                        )
+                        self.show_image()
+                        removed = True
+                        break
+                if not removed:
+                    # 未点中任何椭圆时不做删除，但可保留其他交互（无操作）
+                    pass
 
     def roi_mouse_handler(self, event, x, y, flags, param):
         x = int(x / self.scale_roi)
@@ -292,6 +323,34 @@ class CircleDetector:
                 (global_cx, global_cy, axes_x / 2, axes_y / 2, angle))
             self.show_image(use_tmp=use_tmp)
 
+    def resort_ellipses(self):
+        sorted_ellipse = sorted(self.selected_ellipse,
+                                key=lambda p: (p[1], p[0]))
+        sorted_ellipse.insert(0, (0, 0, 0, 0, 0))
+        sorted_ellipse.append((9999, 9999, 0, 0, 0))
+
+        # 分组：将 y 坐标接近的点分为一行
+        rows = []
+        current_row = [sorted_ellipse[0]]
+
+        for i in range(1, len(sorted_ellipse)):
+            if i % 3 != 0:
+                current_row.append(sorted_ellipse[i])
+            else:
+                rows.append(current_row)
+                current_row = [sorted_ellipse[i]]
+        rows.append(current_row)  # 添加最后一行
+
+        # 对每一行按 x 坐标排序（从左到右）
+        for row in rows:
+            row.sort(key=lambda p: p[0])
+
+        # 按从上到下、从左到右的顺序展平
+        sorted_ellipse = [p for row in rows for p in row]
+        del sorted_ellipse[0]
+        del sorted_ellipse[-1]
+        self.selected_ellipse = sorted_ellipse
+
     def run(self, stop_flag_func=None):
         try:
             cv2.namedWindow(self.win_name, cv2.WINDOW_NORMAL)
@@ -304,17 +363,11 @@ class CircleDetector:
                     break
                 key = cv2.waitKey(1)
                 if key == ord("q"):
+                    self.resort_ellipses()
                     self.save_mask()
                     self.save_polygon()
                     self.save_bbox()
                     break
-                elif key == 27:  # ESC
-                    if self.selected_ellipse:
-                        self.selected_ellipse.pop()
-                        self.show_image()
-                    self.drag_start = None
-                    self.selected_points = []
-                    self.selected_ellipse_temp = self.selected_ellipse.copy()
                 elif key == 32:  # space
                     if self.drag_start is not None:
                         self.process_roi_points()
