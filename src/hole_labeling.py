@@ -368,6 +368,13 @@ class CircleDetector:
                     self.save_polygon()
                     self.save_bbox()
                     break
+                elif key == 27:  # ESC
+                    if self.selected_ellipse:
+                        self.selected_ellipse.pop()
+                        self.show_image()
+                    self.drag_start = None
+                    self.selected_points = []
+                    self.selected_ellipse_temp = self.selected_ellipse.copy()
                 elif key == 32:  # space
                     if self.drag_start is not None:
                         self.process_roi_points()
