@@ -5,6 +5,17 @@ import json
 import os.path as osp
 from .label_optimize import optimize
 from .seg_visualize import seg_visualize
+try:
+    import torch
+    import torch.nn.functional as F
+    from PIL import Image
+    from .unet import UNet
+    METHOD = 'cnn'
+except ImportError:
+    print(
+        "Warning: torch or PIL is not installed, CNN-based methods will not work."
+    )
+    METHOD = 'hough'
 
 
 class CircleDetector:
@@ -41,6 +52,31 @@ class CircleDetector:
         self.canny_points = None
         self.selected_points = []
         self.points2show = []
+
+        global METHOD
+        print(f"Using method: {METHOD}")
+        if METHOD == 'cnn':
+            self.__model_init()
+
+    def __model_init(self):
+        model_path = './src/unet/hole_ellipse.pth'
+        self.model_input_size = (64, 64)
+        bilinear = True
+        heatmap = False
+        scale = 0.5
+        n_classes = 1
+        self.model = UNet(n_channels=3,
+                          n_classes=n_classes,
+                          bilinear=bilinear,
+                          scale=scale,
+                          with_heatmap=heatmap)
+
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(device=self.device)
+        state_dict = torch.load(model_path, map_location=self.device)
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
 
     def read_anno(self):
         if osp.exists(self.polygon_path):
@@ -267,7 +303,38 @@ class CircleDetector:
                                                          r) <= (r *
                                                                 0.1)].tolist()
 
+    def find_ellipses_by_cnn(self, roi):
+        raw_img = Image.fromarray(cv2.cvtColor(roi, cv2.COLOR_BGR2RGB))
+        pil_img = raw_img.resize(self.model_input_size, resample=Image.BICUBIC)
+        img = np.asarray(pil_img)
+        if img.ndim == 2:
+            img = img[np.newaxis, ...]
+        else:
+            img = img.transpose((2, 0, 1))
+        if (img > 1).any():
+            img = img / 255.0
+        img = torch.from_numpy(img)
+        img = img.unsqueeze(0)
+        img = img.to(device=self.device, dtype=torch.float32)
+
+        with torch.no_grad():
+            mask, _ = self.model(img)
+        mask = mask.cpu()
+        mask = F.interpolate(mask, (raw_img.size[1], raw_img.size[0]),
+                             mode="nearest")
+        mask = torch.sigmoid(mask).squeeze().numpy()
+        bin_mask = (mask > 0.5).astype(np.uint8) * 255  # H,W uint8
+        try:
+            contours, _ = cv2.findContours(bin_mask, cv2.RETR_EXTERNAL,
+                                           cv2.CHAIN_APPROX_SIMPLE)
+            cnt = max(contours, key=cv2.contourArea)
+            cnt = cnt.squeeze().tolist()
+        except:
+            cnt = []
+        self.selected_points = cnt
+
     def process_rectangle(self, x, y, w, h):
+        global METHOD
         self.points2show = []
         roi = self.original[y:y + h, x:x + w]
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
@@ -296,7 +363,10 @@ class CircleDetector:
                               fy=self.scale_roi)
         self.current_roi_image = roi_disp
 
-        self.select_points_by_hough(blurred)
+        if METHOD == 'cnn':
+            self.find_ellipses_by_cnn(roi)
+        else:
+            self.select_points_by_hough(blurred)
         self.process_roi_points(use_tmp=True)
 
         cv2.namedWindow(self.roi_win_name, cv2.WINDOW_NORMAL)
