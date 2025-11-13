@@ -74,7 +74,20 @@ class CircleDetector:
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device=self.device)
-        state_dict = torch.load(model_path, map_location=self.device)
+        # Prefer weights_only=True (safer: avoids unpickling arbitrary objects) when supported.
+        # Fall back to legacy call on older PyTorch and emit a warning.
+        try:
+            state_dict = torch.load(model_path,
+                                    map_location=self.device,
+                                    weights_only=True)
+        except TypeError:
+            import warnings
+            warnings.warn(
+                "torch.load weights_only not supported in this PyTorch version; "
+                "falling back to legacy load. Ensure the model file is trusted.",
+                FutureWarning,
+            )
+            state_dict = torch.load(model_path, map_location=self.device)
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
