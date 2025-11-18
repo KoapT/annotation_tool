@@ -8,13 +8,10 @@ from .seg_visualize import seg_visualize
 try:
     import torch
     import torch.nn.functional as F
-    from PIL import Image
     from .unet import UNet
     METHOD = 'cnn'
 except ImportError:
-    print(
-        "Warning: torch or PIL is not installed, CNN-based methods will not work."
-    )
+    print("Warning: torch is not installed, CNN-based methods will not work.")
     METHOD = 'hough'
 
 
@@ -317,26 +314,22 @@ class CircleDetector:
                                                                 0.1)].tolist()
 
     def find_ellipses_by_cnn(self, roi):
-        raw_img = Image.fromarray(cv2.cvtColor(roi, cv2.COLOR_BGR2RGB))
-        pil_img = raw_img.resize(self.model_input_size, resample=Image.BICUBIC)
-        img = np.asarray(pil_img)
-        if img.ndim == 2:
-            img = img[np.newaxis, ...]
-        else:
-            img = img.transpose((2, 0, 1))
-        if (img > 1).any():
-            img = img / 255.0
-        img = torch.from_numpy(img)
-        img = img.unsqueeze(0)
-        img = img.to(device=self.device, dtype=torch.float32)
+        roi_size = roi.shape[:2]
+        img = cv2.resize(roi[:, :, ::-1],
+                         self.model_input_size,
+                         interpolation=cv2.INTER_CUBIC)
+        img = img.transpose((2, 0, 1))
+        img = img / 255.0
+        img_tensor = torch.from_numpy(img)[None, :, :, :]
+        img_tensor = img_tensor.to(device=self.device, dtype=torch.float32)
 
         with torch.no_grad():
-            mask, _ = self.model(img)
+            mask, _ = self.model(img_tensor)
         mask = mask.cpu()
-        mask = F.interpolate(mask, (raw_img.size[1], raw_img.size[0]),
-                             mode="nearest")
+        mask = F.interpolate(mask, roi_size, mode="nearest")
         mask = torch.sigmoid(mask).squeeze().numpy()
         bin_mask = (mask > 0.5).astype(np.uint8) * 255  # H,W uint8
+
         try:
             contours, _ = cv2.findContours(bin_mask, cv2.RETR_EXTERNAL,
                                            cv2.CHAIN_APPROX_SIMPLE)
